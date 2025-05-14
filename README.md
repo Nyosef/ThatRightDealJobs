@@ -4,7 +4,7 @@ A repository for the ThatRightDeal project.
 
 ## Description
 
-This repository contains the source code and resources for the ThatRightDeal project.
+This repository contains the source code and resources for the ThatRightDeal project. It uses Supabase PostgreSQL as a service database for data storage and retrieval.
 
 ## Getting Started
 
@@ -44,12 +44,17 @@ This project uses environment variables to manage API keys and other sensitive c
    cp .env.example .env
    ```
 
-2. Edit the `.env` file and replace the placeholder value with your actual ATTOM API key.
+2. Edit the `.env` file and replace the placeholder values with your actual API keys and configuration.
 
-3. The following environment variable is used in this project:
+3. The following environment variables are used in this project:
 
    - **ATTOM API**
+
      - `ATTOM_API_KEY`: API key for accessing ATTOM property data services
+
+   - **Supabase Configuration**
+     - `SUPABASE_URL`: Your Supabase project URL (e.g., https://xyzproject.supabase.co)
+     - `SUPABASE_KEY`: Your Supabase anon/public key
 
 4. The `.env` file is excluded from version control in `.gitignore` to prevent exposing sensitive information.
 
@@ -66,10 +71,52 @@ The ATTOM API provides access to property data, including:
 
 For more information about the ATTOM API, visit [ATTOM Data Solutions](https://www.attomdata.com/).
 
+### About Supabase
+
+Supabase is an open-source Firebase alternative that provides:
+
+- PostgreSQL Database: A powerful, open-source relational database
+- Authentication: User management and authentication
+- Auto-generated APIs: Instant RESTful APIs for your database
+- Storage: File storage with security rules
+- Realtime: Build realtime applications
+
+This project uses Supabase as a service database to store and retrieve data. For more information about Supabase, visit [Supabase](https://supabase.com/).
+
+## Database Setup
+
+To use the Supabase PostgreSQL database with this project:
+
+1. Create a Supabase account at [supabase.com](https://supabase.com/) if you don't have one already.
+2. Create a new Supabase project.
+3. In your Supabase project dashboard, navigate to Settings > API to find your project URL and anon/public key.
+4. Add these values to your `.env` file as `SUPABASE_URL` and `SUPABASE_KEY`.
+5. Create the necessary tables in your Supabase database:
+
+   - `api_data`: Stores data fetched from external APIs
+     - Columns:
+       - `id`: UUID (primary key, auto-generated)
+       - `userId`: Integer
+       - `title`: Text
+       - `body`: Text
+       - `fetched_at`: Timestamp
+
+   You can create this table using the Supabase dashboard or with the following SQL:
+
+   ```sql
+   CREATE TABLE api_data (
+     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+     userId INTEGER,
+     title TEXT,
+     body TEXT,
+     fetched_at TIMESTAMP WITH TIME ZONE
+   );
+   ```
+
 ## Scripts
 
-- `npm start`: Start the application
-- `npm run daily-task`: Run the daily task script
+- `npm start`: Start the application and test the Supabase connection
+- `npm run daily-task`: Run the daily task script that fetches data and stores it in Supabase
 
 ## License
 
