@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/username/ThatRightDeal#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "dotenv": "^16.5.0"
   }
 }
