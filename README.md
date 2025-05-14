@@ -122,7 +122,7 @@ To use the Supabase PostgreSQL database with this project:
 
 This project includes a GitHub Actions workflow that runs the daily task automatically:
 
-1. **Schedule**: The workflow runs daily at midnight UTC
+1. **Schedule**: The workflow runs daily at 8:00 AM UTC
 2. **Manual Trigger**: You can also trigger the workflow manually from the Actions tab
 
 ### Setting up GitHub Secrets
