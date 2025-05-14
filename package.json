@@ -1,0 +1,28 @@
+{
+  "name": "that-right-deal",
+  "version": "1.0.0",
+  "description": "A repository for the ThatRightDeal project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "daily-task": "node scripts/daily-task.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/username/ThatRightDeal.git"
+  },
+  "keywords": [
+    "deal",
+    "right",
+    "that"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/username/ThatRightDeal/issues"
+  },
+  "homepage": "https://github.com/username/ThatRightDeal#readme",
+  "dependencies": {},
+  "devDependencies": {}
+}

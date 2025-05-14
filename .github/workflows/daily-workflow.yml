@@ -1,0 +1,34 @@
+name: Daily Morning Workflow
+
+on:
+  schedule:
+    # Runs at 8:00 AM UTC every day
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    # Allows manual triggering of the workflow
+
+jobs:
+  daily-job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run daily tasks
+        run: |
+          echo "Running daily tasks at $(date)"
+          npm run daily-task
+
+      - name: Report status
+        run: |
+          echo "Daily workflow completed successfully"
