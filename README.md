@@ -118,6 +118,28 @@ To use the Supabase PostgreSQL database with this project:
 - `npm start`: Start the application and test the Supabase connection
 - `npm run daily-task`: Run the daily task script that fetches data and stores it in Supabase
 
+## GitHub Actions Workflow
+
+This project includes a GitHub Actions workflow that runs the daily task automatically:
+
+1. **Schedule**: The workflow runs daily at midnight UTC
+2. **Manual Trigger**: You can also trigger the workflow manually from the Actions tab
+
+### Setting up GitHub Secrets
+
+To make the GitHub Actions workflow work correctly, you need to add the following secrets to your GitHub repository:
+
+1. Go to your GitHub repository
+2. Click on "Settings" tab
+3. In the left sidebar, click on "Secrets and variables" → "Actions"
+4. Click on "New repository secret"
+5. Add the following secrets:
+   - `ATTOM_API_KEY`: Your ATTOM API key
+   - `SUPABASE_URL`: Your Supabase project URL
+   - `SUPABASE_KEY`: Your Supabase anon key
+
+These secrets will be used to create the `.env` file during the workflow execution, ensuring that both the ATTOM API and Supabase are properly configured.
+
 ## License
 
 This project is licensed under the MIT License.
