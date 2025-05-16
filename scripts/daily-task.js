@@ -129,7 +129,9 @@ async function runDailyTasks(zipCodes = process.env.TARGET_ZIP_CODES) {
     // Log summary
     console.log('\n--- Processing Summary ---');
     for (const [zipCode, result] of Object.entries(results)) {
-      console.log(`Zip ${zipCode}: ${result.sales.inserted} new sales, ${result.sales.updated} updated sales, ${result.properties.inserted} new properties, ${result.properties.updated} updated properties`);
+      console.log(`Zip ${zipCode}:`);
+      console.log(`  Properties: ${result.properties.inserted} new, ${result.properties.updated} updated, ${result.properties.unchanged || 0} unchanged`);
+      console.log(`  Sales: ${result.sales.inserted} new, ${result.sales.updated} updated, ${result.sales.unchanged || 0} unchanged`);
     }
     
     return results;
@@ -178,8 +180,8 @@ async function fetchDataForZipCode(zipCode) {
     const saleResult = await models.sale.processAndUpsertFromAttom(data, zipCode);
     
     console.log(`\n--- Summary for zip code ${zipCode} ---`);
-    console.log(`Properties: ${propertyResult.inserted} new, ${propertyResult.updated} updated, ${propertyResult.errors} errors`);
-    console.log(`Sales: ${saleResult.inserted} new, ${saleResult.updated} updated, ${saleResult.skipped || 0} skipped, ${saleResult.errors} errors`);
+    console.log(`Properties: ${propertyResult.inserted} new, ${propertyResult.updated} updated, ${propertyResult.unchanged || 0} unchanged, ${propertyResult.skipped || 0} skipped, ${propertyResult.errors} errors`);
+    console.log(`Sales: ${saleResult.inserted} new, ${saleResult.updated} updated, ${saleResult.unchanged || 0} unchanged, ${saleResult.skipped || 0} skipped, ${saleResult.errors} errors`);
     
     return {
       sales: saleResult,

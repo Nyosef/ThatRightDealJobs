@@ -66,7 +66,9 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
   const result = {
     inserted: 0,
     updated: 0,
-    errors: 0
+    unchanged: 0,
+    errors: 0,
+    skipped: 0
   };
   
   // Extract properties from API response
@@ -79,15 +81,12 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
       // Transform API data to our schema
       const propertyData = transformAttomPropertyData(property, zipCode);
       
-      // Debug the first property
-      if (result.inserted === 0 && result.updated === 0 && result.errors === 0) {
-        console.log('First property data:', JSON.stringify(propertyData, null, 2));
-        console.log('Original property data structure:', JSON.stringify(property, null, 2));
-      }
+      // Debug logging removed as requested
       
       // Skip if no attom_id
       if (!propertyData.attom_id) {
         console.warn('Property missing attom_id, skipping');
+        result.skipped++;
         continue;
       }
       
@@ -97,8 +96,12 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
       if (existingProperty) {
         // Check if data has changed
         if (hasPropertyDataChanged(existingProperty, propertyData)) {
+          console.log(`Updating property with attom_id: ${propertyData.attom_id} - data has changed`);
           await update(existingProperty.attom_id, propertyData);
           result.updated++;
+        } else {
+          // Record is unchanged
+          result.unchanged++;
         }
       } else {
         // Insert new property
@@ -153,18 +156,101 @@ function transformAttomPropertyData(property, zipCode) {
   };
 }
 
+/**
+ * Helper function to compare floating point values with a small epsilon
+ * to account for precision differences
+ * @param {number|string} a - First value
+ * @param {number|string} b - Second value
+ * @returns {boolean} True if values are equal within epsilon
+ */
+function floatsAreEqual(a, b) {
+  // If either value is null/undefined, convert to empty string for comparison
+  if (a == null) a = '';
+  if (b == null) b = '';
+  
+  // If both are empty strings, they're equal
+  if (a === '' && b === '') return true;
+  
+  // Try to parse as floats
+  const floatA = parseFloat(a);
+  const floatB = parseFloat(b);
+  
+  // If either can't be parsed as a float, do string comparison
+  if (isNaN(floatA) || isNaN(floatB)) {
+    return String(a) === String(b);
+  }
+  
+  // For floating point comparison, use a small epsilon
+  const epsilon = 0.0000001;
+  return Math.abs(floatA - floatB) < epsilon;
+}
+
 function hasPropertyDataChanged(existingProperty, newPropertyData) {
-  // Compare relevant fields
-  return (
-    existingProperty.address_line1 !== newPropertyData.address_line1 || // Changed from address_line to address_line1
-    existingProperty.address_full !== newPropertyData.address_full ||
-    existingProperty.lat !== newPropertyData.lat ||
-    existingProperty.lon !== newPropertyData.lon ||
-    existingProperty.property_type !== newPropertyData.property_type ||
-    existingProperty.year_built !== newPropertyData.year_built ||
-    existingProperty.livable_sqft !== newPropertyData.livable_sqft ||
-    existingProperty.lot_size_acre !== newPropertyData.lot_size_acre
+  // Compare only essential fields that matter for business logic
+  
+  // Text fields - use simple string comparison
+  const existingAddress = existingProperty.address_line1 || '';
+  const newAddress = newPropertyData.address_line1 || '';
+  
+  const existingAddressFull = existingProperty.address_full || '';
+  const newAddressFull = newPropertyData.address_full || '';
+  
+  const existingPropType = existingProperty.property_type || '';
+  const newPropType = newPropertyData.property_type || '';
+  
+  // Numeric fields - use float comparison
+  const addressChanged = existingAddress !== newAddress;
+  const addressFullChanged = existingAddressFull !== newAddressFull;
+  const propTypeChanged = existingPropType !== newPropType;
+  
+  // Use float comparison for numeric fields
+  const latChanged = !floatsAreEqual(existingProperty.lat, newPropertyData.lat);
+  const lonChanged = !floatsAreEqual(existingProperty.lon, newPropertyData.lon);
+  const yearBuiltChanged = !floatsAreEqual(existingProperty.year_built, newPropertyData.year_built);
+  const livableSqftChanged = !floatsAreEqual(existingProperty.livable_sqft, newPropertyData.livable_sqft);
+  const lotSizeChanged = !floatsAreEqual(existingProperty.lot_size_acre, newPropertyData.lot_size_acre);
+  
+  // Check if any essential fields have changed
+  const hasChanged = (
+    addressChanged ||
+    addressFullChanged ||
+    latChanged ||
+    lonChanged ||
+    propTypeChanged ||
+    yearBuiltChanged ||
+    livableSqftChanged ||
+    lotSizeChanged
   );
+  
+  if (hasChanged) {
+    console.log(`Property data changed for attom_id ${existingProperty.attom_id}:`);
+    if (addressChanged) {
+      console.log(`  - Address changed: ${existingAddress} -> ${newAddress}`);
+    }
+    if (addressFullChanged) {
+      console.log(`  - Full address changed: ${existingAddressFull} -> ${newAddressFull}`);
+    }
+    if (latChanged) {
+      console.log(`  - Latitude changed: ${existingProperty.lat} -> ${newPropertyData.lat}`);
+    }
+    if (lonChanged) {
+      console.log(`  - Longitude changed: ${existingProperty.lon} -> ${newPropertyData.lon}`);
+    }
+    if (propTypeChanged) {
+      console.log(`  - Property type changed: ${existingPropType} -> ${newPropType}`);
+    }
+    if (yearBuiltChanged) {
+      console.log(`  - Year built changed: ${existingProperty.year_built} -> ${newPropertyData.year_built}`);
+    }
+    if (livableSqftChanged) {
+      console.log(`  - Livable sqft changed: ${existingProperty.livable_sqft} -> ${newPropertyData.livable_sqft}`);
+    }
+    if (lotSizeChanged) {
+      console.log(`  - Lot size changed: ${existingProperty.lot_size_acre} -> ${newPropertyData.lot_size_acre}`);
+    }
+  }
+  
+  return hasChanged;
 }
 
 module.exports = {
