@@ -1,145 +1,170 @@
 # ThatRightDeal
 
-A repository for the ThatRightDeal project.
+A data pipeline for real estate property data, fetching from various APIs and storing in a Supabase database.
 
-## Description
+## Project Structure
 
-This repository contains the source code and resources for the ThatRightDeal project. It uses Supabase PostgreSQL as a service database for data storage and retrieval.
+- `api/` - API client implementations for different data sources
+  - `attom/` - ATTOM API integration
+  - `rentcast/` - (Future) Rentcast API integration
+- `models/` - Database models and data processing logic
+- `scripts/` - Executable scripts for data tasks
+- `utils/` - Utility functions and helpers
 
-## Getting Started
+## ATTOM API Integration
 
-### Prerequisites
+This project integrates with the ATTOM API to fetch property sale data. The integration:
 
-- Node.js (v14 or higher recommended)
-- npm (v6 or higher recommended)
+1. Fetches sale snapshot data for configured zip codes
+2. Processes the API response and maps it to our database schema
+3. Stores the data in the Supabase database, updating existing records if they've changed
 
-### Installation
+### API Endpoints Used
 
-1. Clone the repository:
+- `sale/snapshot` - Fetches property sale data for a specific geographic area and date range
 
-   ```
-   git clone https://github.com/username/ThatRightDeal.git
-   cd ThatRightDeal
-   ```
+### Data Flow
 
-2. Install dependencies:
+1. The daily task script runs (manually or via GitHub Actions)
+2. For each configured zip code:
+   - Calculates a date range (one month back from current date)
+   - Fetches sale data from ATTOM API
+   - Processes the API response
+   - Inserts new records and updates changed records in the database
+3. Logs a summary of the operations performed
 
-   ```
-   npm install
-   ```
+## Database Schema
 
-3. Set up environment variables:
-   ```
-   cp .env.example .env
-   ```
-   Then edit the `.env` file and add your actual API keys and configuration values.
+The database has the following tables:
 
-## Environment Configuration
+1. `api_data` - Stores raw API responses
 
-This project uses environment variables to manage API keys and other sensitive configuration. The following steps explain how to set up your environment:
+   - `id` (int8) - Primary key
+   - `created_at` (timestamptz) - Record creation timestamp
+   - `data` (json) - Raw API response data
 
-1. Copy the example environment file:
+2. `sale_fact` - Stores processed sale data
 
-   ```
-   cp .env.example .env
-   ```
+   - `sale_id` (int8) - Primary key
+   - `attom_id` (int8) - ATTOM property ID
+   - `zip5` (bpchar) - ZIP code
+   - `rec_date` (date) - Record date
+   - `sale_amt` (numeric) - Sale amount
+   - `trans_type` (text) - Transaction type
+   - `trans_date` (date) - Transaction date
+   - `sale_meta` (jsonb) - Additional sale metadata
+   - `imported_at` (timestamptz) - Import timestamp
 
-2. Edit the `.env` file and replace the placeholder values with your actual API keys and configuration.
+3. `property` - Stores property information
 
-3. The following environment variables are used in this project:
+   - `attom_id` (int8) - Primary key
+   - `zip5` (bpchar) - ZIP code
+   - `apn` (text) - Assessor's Parcel Number
+   - `address_line` (text) - Street address
+   - `address_full` (text) - Full address
+   - `lat` (numeric) - Latitude
+   - `lon` (numeric) - Longitude
+   - `property_type` (text) - Property type
+   - `year_built` (int2) - Year built
+   - `livable_sqft` (int4) - Livable square footage
+   - `lot_size_acre` (numeric) - Lot size in acres
+   - `last_updated` (date) - Last update date
 
-   - **ATTOM API**
+4. `zip` - Stores ZIP code information
+   - `zip5` (bpchar) - Primary key
+   - `geo_id_v4` (uuid) - Geographic ID
+   - `city` (text) - City
+   - `state` (text) - State
+   - `land_sq_mi` (numeric) - Land area in square miles
+   - `water_sq_mi` (numeric) - Water area in square miles
+   - `created_at` (timestamptz) - Record creation timestamp
 
-     - `ATTOM_API_KEY`: API key for accessing ATTOM property data services
+## Configuration
 
-   - **Supabase Configuration**
-     - `SUPABASE_URL`: Your Supabase project URL (e.g., https://xyzproject.supabase.co)
-     - `SUPABASE_KEY`: Your Supabase anon/public key
+The application uses environment variables for configuration:
 
-4. The `.env` file is excluded from version control in `.gitignore` to prevent exposing sensitive information.
+- `ATTOM_API_KEY` - ATTOM API key
+- `SUPABASE_URL` - Supabase URL
+- `SUPABASE_KEY` - Supabase API key
+- `TARGET_ZIP_CODES` - Comma-separated list of ZIP codes to process (optional)
+- `ZIP_GEOID_MAPPING` - JSON string mapping ZIP codes to geoIdV4 values (optional)
 
-### About ATTOM API
+## Running the Application
 
-The ATTOM API provides access to property data, including:
+### Locally
 
-- Property characteristics
-- Owner information
-- Tax assessments
-- Sales history
-- Foreclosure data
-- And more
+1. Clone the repository
+2. Copy `.env.example` to `.env` and fill in your API keys
+3. Install dependencies: `npm install`
+4. Run the daily task: `node scripts/daily-task.js`
 
-For more information about the ATTOM API, visit [ATTOM Data Solutions](https://www.attomdata.com/).
+### With Command-Line Arguments
 
-### About Supabase
+You can specify which ZIP codes to process using command-line arguments:
 
-Supabase is an open-source Firebase alternative that provides:
+```bash
+node scripts/daily-task.js --zip=16146,90210
+```
 
-- PostgreSQL Database: A powerful, open-source relational database
-- Authentication: User management and authentication
-- Auto-generated APIs: Instant RESTful APIs for your database
-- Storage: File storage with security rules
-- Realtime: Build realtime applications
+### With GitHub Actions
 
-This project uses Supabase as a service database to store and retrieve data. For more information about Supabase, visit [Supabase](https://supabase.com/).
+The application can be run automatically using GitHub Actions. Create a workflow file in `.github/workflows/daily-update.yml`:
 
-## Database Setup
+```yaml
+name: Daily Property Data Update
 
-To use the Supabase PostgreSQL database with this project:
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      zip_codes:
+        description: "Comma-separated list of zip codes to process (leave empty for all)"
+        required: false
+        default: ""
 
-1. Create a Supabase account at [supabase.com](https://supabase.com/) if you don't have one already.
-2. Create a new Supabase project.
-3. In your Supabase project dashboard, navigate to Settings > API to find your project URL and anon/public key.
-4. Add these values to your `.env` file as `SUPABASE_URL` and `SUPABASE_KEY`.
-5. Create the necessary tables in your Supabase database:
+jobs:
+  update-property-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-   - `api_data`: Stores data fetched from external APIs
-     - Columns:
-       - `id`: UUID (primary key, auto-generated)
-       - `userId`: Integer
-       - `title`: Text
-       - `body`: Text
-       - `fetched_at`: Timestamp
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
 
-   You can create this table using the Supabase dashboard or with the following SQL:
+      - name: Install dependencies
+        run: npm ci
 
-   ```sql
-   CREATE TABLE api_data (
-     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-     userId INTEGER,
-     title TEXT,
-     body TEXT,
-     fetched_at TIMESTAMP WITH TIME ZONE
-   );
-   ```
+      - name: Run daily task
+        env:
+          ATTOM_API_KEY: ${{ secrets.ATTOM_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TARGET_ZIP_CODES: ${{ github.event.inputs.zip_codes || '' }}
+        run: node scripts/daily-task.js
+```
 
-## Scripts
+## Adding New API Integrations
 
-- `npm start`: Start the application and test the Supabase connection
-- `npm run daily-task`: Run the daily task script that fetches data and stores it in Supabase
+To add a new API integration (like Rentcast):
 
-## GitHub Actions Workflow
+1. Create a new directory under `api/` for the new API
+2. Implement the API client and specific API functions
+3. Create model functions to process and store the data
+4. Update the daily task script to use the new API functions
 
-This project includes a GitHub Actions workflow that runs the daily task automatically:
+## Extending ZIP Code Coverage
 
-1. **Schedule**: The workflow runs daily at 8:00 AM UTC
-2. **Manual Trigger**: You can also trigger the workflow manually from the Actions tab
+To add support for new ZIP codes:
 
-### Setting up GitHub Secrets
+1. Add the ZIP code and its corresponding geoIdV4 to the `DEFAULT_ZIP_GEOID_MAPPING` in `utils/config.js`
+2. The script will automatically include the new ZIP code in its processing
 
-To make the GitHub Actions workflow work correctly, you need to add the following secrets to your GitHub repository:
+Alternatively, you can set the `ZIP_GEOID_MAPPING` environment variable with a JSON string:
 
-1. Go to your GitHub repository
-2. Click on "Settings" tab
-3. In the left sidebar, click on "Secrets and variables" → "Actions"
-4. Click on "New repository secret"
-5. Add the following secrets:
-   - `ATTOM_API_KEY`: Your ATTOM API key
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_KEY`: Your Supabase anon key
-
-These secrets will be used to create the `.env` file during the workflow execution, ensuring that both the ATTOM API and Supabase are properly configured.
-
-## License
-
-This project is licensed under the MIT License.
+```
+ZIP_GEOID_MAPPING={"16146":"9910140a4987c800f1399e10ccabb2d0","90210":"another-geo-id-here"}
+```

@@ -1,16 +1,23 @@
 /**
- * Daily task script that makes a simple API call and stores the results in Supabase
- * This script fetches data from a public API and logs the results
+ * Daily task script that fetches property data from ATTOM API
+ * and stores the results in Supabase
  */
 
-// Load environment variables from .env file
+// Load environment variables
 require('dotenv').config();
 
-// Import the database utilities
+// Import modules
 const { db } = require('../index');
+const { attom } = require('../api');
+const models = require('../models');
+const { formatDate, getDateMonthsAgo } = require('../utils/date');
+const { getZipGeoIdMapping } = require('../utils/config');
+
+// Configuration for zip codes and their geoIdV4 values
+const ZIP_GEOID_MAPPING = getZipGeoIdMapping();
 
 /**
- * Fetch data from the _test_connection table to verify Supabase connection
+ * Test Supabase connection
  */
 async function testSupabaseConnection() {
   try {
@@ -76,121 +83,135 @@ async function testSupabaseConnection() {
   }
 }
 
-async function fetchDailyData() {
+/**
+ * Main function to run the daily task for one or more zip codes
+ * @param {string|string[]} zipCodes - Single zip code or array of zip codes to process
+ */
+async function runDailyTasks(zipCodes = process.env.TARGET_ZIP_CODES) {
   try {
-    console.log('Starting daily API fetch task...');
+    // First test the Supabase connection
+    await testSupabaseConnection();
     
-    // Check if ATTOM API key is configured
-    if (!process.env.ATTOM_API_KEY) {
-      console.warn('Warning: ATTOM API key is not configured. Using public API for demonstration.');
-    } else {
-      // Mask the API key for security when logging
-      const maskedKey = process.env.ATTOM_API_KEY.substring(0, 4) + '...' + 
-                        process.env.ATTOM_API_KEY.substring(process.env.ATTOM_API_KEY.length - 4);
-      console.log(`Using ATTOM API key: ${maskedKey}`);
-    }
+    // Parse zip codes from input
+    const targetZipCodes = Array.isArray(zipCodes) 
+      ? zipCodes 
+      : (zipCodes || '').split(',').map(zip => zip.trim()).filter(Boolean);
     
-    // For demonstration, still using JSONPlaceholder since we don't want to make actual ATTOM API calls
-    // In a real application, you would use the ATTOM API with the key
-    const response = await fetch('https://jsonplaceholder.typicode.com/posts/1');
+    // If no zip codes specified and we have a mapping, use all configured zip codes
+    const zipsToProcess = targetZipCodes.length > 0 
+      ? targetZipCodes 
+      : Object.keys(ZIP_GEOID_MAPPING);
     
-    if (!response.ok) {
-      throw new Error(`API request failed with status: ${response.status}`);
-    }
+    console.log(`Processing ${zipsToProcess.length} zip codes: ${zipsToProcess.join(', ')}`);
     
-    const data = await response.json();
-    
-    // Log the results
-    console.log('Successfully fetched data:');
-    console.log(JSON.stringify(data, null, 2));
-    
-    // Check if Supabase is configured
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
-      try {
-        console.log('Storing data in Supabase...');
-        
-        // Format the data for the api_data table with a JSON data column
-        const apiDataRecord = {
-          data: {
-            ...data,
-            fetched_at: new Date().toISOString()
-          }
-        };
-        
-        // Store the data in api_data table
-        console.log('Inserting into api_data table...');
-        const apiResult = await db.insertRecord('api_data', apiDataRecord);
-        console.log('Data successfully stored in api_data table:');
-        console.log(JSON.stringify(apiResult, null, 2));
-        
-        // Also store the data in _test_connection table
-        console.log('Inserting into _test_connection table...');
-        const testConnectionRecord = {
-          message: 'API data stored successfully',
-          created_at: new Date().toISOString(),
-          data: data // Store the API response as JSON
-        };
-        
-        const testResult = await db.insertRecord('_test_connection', testConnectionRecord);
-        console.log('Data successfully stored in _test_connection table:');
-        console.log(JSON.stringify(testResult, null, 2));
-        
-        // Query recent records from api_data
-        console.log('Retrieving recent records from api_data table...');
-        const recentApiRecords = await db.queryRecords('api_data', { limit: 5 });
-        console.log(`Found ${recentApiRecords.length} recent records in api_data:`);
-        console.log(JSON.stringify(recentApiRecords, null, 2));
-        
-        // Query recent records from _test_connection
-        console.log('Retrieving recent records from _test_connection table...');
-        const recentTestRecords = await db.queryRecords('_test_connection', { limit: 5 });
-        console.log(`Found ${recentTestRecords.length} recent records in _test_connection:`);
-        console.log(JSON.stringify(recentTestRecords, null, 2));
-      } catch (dbError) {
-        console.error('Error storing data in Supabase:', dbError.message);
-        
-        // Check for RLS policy error
-        if (dbError.message.includes('row-level security policy')) {
-          console.log('\n--- ROW LEVEL SECURITY ERROR ---');
-          console.log('This error occurs because Supabase tables have Row Level Security (RLS) enabled by default.');
-          console.log('To fix this, you need to either:');
-          console.log('1. Disable RLS for the api_data table (for development only):');
-          console.log('   - Go to your Supabase dashboard');
-          console.log('   - Navigate to Database > Tables > api_data');
-          console.log('   - Click on "Row Level Security" and turn it OFF');
-          console.log('\n2. OR Create an RLS policy that allows inserts:');
-          console.log('   - Go to your Supabase dashboard');
-          console.log('   - Navigate to Database > Tables > api_data');
-          console.log('   - Click on "Policies" and add a new policy');
-          console.log('   - Create a policy with the following SQL:');
-          console.log('     CREATE POLICY "Allow all operations for authenticated users" ON api_data');
-          console.log('     FOR ALL USING (auth.role() = \'authenticated\');\n');
-        }
-        
-        console.log('Continuing with task despite database error...');
+    // STEP 1: Pre-process all zip codes to ensure they exist in the database
+    console.log('\n--- Pre-processing all zip codes ---');
+    const filteredZips = {};
+    for (const zipCode of zipsToProcess) {
+      if (!ZIP_GEOID_MAPPING[zipCode]) {
+        console.warn(`Warning: No geoIdV4 mapping found for zip code ${zipCode}. Skipping.`);
+        continue;
       }
-    } else {
-      console.log('Supabase is not configured. Skipping database operations.');
+      filteredZips[zipCode] = ZIP_GEOID_MAPPING[zipCode];
     }
     
-    console.log('Daily task completed successfully!');
-    return data;
+    // Process all zip codes at once
+    const zipResult = await models.zip.processZipCodes(filteredZips);
+    console.log(`Zip codes processed: ${zipResult.inserted} inserted, ${zipResult.existing} existing, ${zipResult.errors} errors`);
+    
+    // STEP 2: Process each zip code for properties and sales
+    const results = {};
+    for (const zipCode of Object.keys(filteredZips)) {
+      console.log(`\n--- Processing zip code: ${zipCode} ---`);
+      results[zipCode] = await fetchDataForZipCode(zipCode);
+    }
+    
+    // Log summary
+    console.log('\n--- Processing Summary ---');
+    for (const [zipCode, result] of Object.entries(results)) {
+      console.log(`Zip ${zipCode}: ${result.sales.inserted} new sales, ${result.sales.updated} updated sales, ${result.properties.inserted} new properties, ${result.properties.updated} updated properties`);
+    }
+    
+    return results;
   } catch (error) {
-    console.error('Error in daily task:', error.message);
+    console.error('Error in daily tasks:', error);
     process.exit(1);
   }
 }
 
-// Execute the functions
-async function runDailyTasks() {
-  // First test the Supabase connection
-  await testSupabaseConnection();
-  
-  // Then run the regular daily data fetch
-  await fetchDailyData();
+/**
+ * Fetch and process data for a specific zip code
+ * @param {string} zipCode - The zip code to process
+ */
+async function fetchDataForZipCode(zipCode) {
+  try {
+    console.log(`Fetching data for zip code ${zipCode}...`);
+    
+    const geoIdV4 = ZIP_GEOID_MAPPING[zipCode];
+    
+    // STEP 1: Ensure the zip code exists in the database
+    console.log(`\n--- Ensuring zip code ${zipCode} exists in the database ---`);
+    await models.zip.ensureZipExists(zipCode, geoIdV4);
+    
+    // Calculate the date range (one month back from today)
+    const endDate = new Date();
+    const startDate = getDateMonthsAgo(endDate, 1);
+    
+    // Format dates for the API call
+    const formattedStartDate = formatDate(startDate);
+    const formattedEndDate = formatDate(endDate);
+    
+    console.log(`Fetching sales data for zip ${zipCode} from ${formattedStartDate} to ${formattedEndDate}`);
+    
+    // Fetch data from ATTOM API for this specific zip code
+    const data = await attom.getSaleSnapshot(geoIdV4, formattedStartDate, formattedEndDate);
+    
+    // Store raw API response
+    await models.apiData.storeRawApiData(data, 'attom', zipCode);
+    
+    // STEP 2: Process and store/update property data
+    console.log(`\n--- Processing properties for zip code ${zipCode} ---`);
+    const propertyResult = await models.property.processAndUpsertFromAttom(data, zipCode);
+    
+    // STEP 3: Process and store/update sale data
+    console.log(`\n--- Processing sales for zip code ${zipCode} ---`);
+    const saleResult = await models.sale.processAndUpsertFromAttom(data, zipCode);
+    
+    console.log(`\n--- Summary for zip code ${zipCode} ---`);
+    console.log(`Properties: ${propertyResult.inserted} new, ${propertyResult.updated} updated, ${propertyResult.errors} errors`);
+    console.log(`Sales: ${saleResult.inserted} new, ${saleResult.updated} updated, ${saleResult.skipped || 0} skipped, ${saleResult.errors} errors`);
+    
+    return {
+      sales: saleResult,
+      properties: propertyResult
+    };
+  } catch (error) {
+    console.error(`Error processing zip code ${zipCode}:`, error.message);
+    // Don't exit the process, just return an error result
+    return {
+      error: error.message,
+      sales: { inserted: 0, updated: 0, errors: 0 },
+      properties: { inserted: 0, updated: 0, errors: 0 }
+    };
+  }
 }
 
-runDailyTasks().catch(error => {
-  console.error('Error in daily tasks:', error);
-  process.exit(1);
-});
+// Execute the script if run directly
+if (require.main === module) {
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  const zipCodesArg = args.find(arg => arg.startsWith('--zip='));
+  const zipCodes = zipCodesArg ? zipCodesArg.replace('--zip=', '') : process.env.TARGET_ZIP_CODES;
+  
+  // Run the daily tasks
+  runDailyTasks(zipCodes).catch(error => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
+  });
+} else {
+  // Script is being imported as a module
+  module.exports = {
+    runDailyTasks,
+    fetchDataForZipCode
+  };
+}
