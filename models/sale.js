@@ -66,6 +66,7 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
   const result = {
     inserted: 0,
     updated: 0,
+    unchanged: 0,
     errors: 0,
     skipped: 0
   };
@@ -80,11 +81,7 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
       // Transform API data to our schema
       const saleData = transformAttomSaleData(sale, zipCode);
       
-      // Debug the first sale
-      if (result.inserted === 0 && result.updated === 0 && result.errors === 0 && result.skipped === 0) {
-        console.log('First sale data:', JSON.stringify(saleData, null, 2));
-        console.log('Original sale data structure:', JSON.stringify(sale, null, 2));
-      }
+      // Debug logging removed as requested
       
       // Skip if no attom_id
       if (!saleData.attom_id) {
@@ -118,10 +115,14 @@ async function processAndUpsertFromAttom(apiData, zipCode) {
       const existingSale = await findBySaleId(saleData.sale_id);
       
       if (existingSale) {
-        // Check if data has changed
+        // Check if essential data has changed
         if (hasSaleDataChanged(existingSale, saleData)) {
+          console.log(`Updating sale with sale_id: ${saleData.sale_id} - data has changed`);
           await update(existingSale.sale_id, saleData);
           result.updated++;
+        } else {
+          // Record is unchanged
+          result.unchanged++;
         }
       } else {
         // Insert new sale
@@ -189,14 +190,75 @@ function transformAttomSaleData(sale, zipCode) {
   };
 }
 
+/**
+ * Helper function to compare floating point values with a small epsilon
+ * to account for precision differences
+ * @param {number|string} a - First value
+ * @param {number|string} b - Second value
+ * @returns {boolean} True if values are equal within epsilon
+ */
+function floatsAreEqual(a, b) {
+  // If either value is null/undefined, convert to empty string for comparison
+  if (a == null) a = '';
+  if (b == null) b = '';
+  
+  // If both are empty strings, they're equal
+  if (a === '' && b === '') return true;
+  
+  // Try to parse as floats
+  const floatA = parseFloat(a);
+  const floatB = parseFloat(b);
+  
+  // If either can't be parsed as a float, do string comparison
+  if (isNaN(floatA) || isNaN(floatB)) {
+    return String(a) === String(b);
+  }
+  
+  // For floating point comparison, use a small epsilon
+  const epsilon = 0.0000001;
+  return Math.abs(floatA - floatB) < epsilon;
+}
+
 function hasSaleDataChanged(existingSale, newSaleData) {
-  // Compare relevant fields
-  return (
-    existingSale.sale_amt !== newSaleData.sale_amt ||
-    existingSale.trans_type !== newSaleData.trans_type ||
-    existingSale.trans_date !== newSaleData.trans_date ||
-    JSON.stringify(existingSale.sale_meta) !== JSON.stringify(newSaleData.sale_meta)
+  // Compare only essential fields that matter for business logic
+  // Ignore sale_meta which can contain timestamps and other metadata that changes
+  // but doesn't represent a meaningful change to the sale data
+  
+  // Text fields - use simple string comparison
+  const existingTransType = existingSale.trans_type || '';
+  const newTransType = newSaleData.trans_type || '';
+  
+  const existingTransDate = existingSale.trans_date || '';
+  const newTransDate = newSaleData.trans_date || '';
+  
+  // Use float comparison for numeric fields
+  const transTypeChanged = existingTransType !== newTransType;
+  const transDateChanged = existingTransDate !== newTransDate;
+  
+  // Use float comparison for sale amount
+  const saleAmtChanged = !floatsAreEqual(existingSale.sale_amt, newSaleData.sale_amt);
+  
+  // Check if any essential fields have changed
+  const hasChanged = (
+    saleAmtChanged ||
+    transTypeChanged ||
+    transDateChanged
   );
+  
+  if (hasChanged) {
+    console.log(`Sale data changed for sale_id ${existingSale.sale_id}:`);
+    if (saleAmtChanged) {
+      console.log(`  - Sale amount changed: ${existingSale.sale_amt} -> ${newSaleData.sale_amt}`);
+    }
+    if (transTypeChanged) {
+      console.log(`  - Transaction type changed: ${existingTransType} -> ${newTransType}`);
+    }
+    if (transDateChanged) {
+      console.log(`  - Transaction date changed: ${existingTransDate} -> ${newTransDate}`);
+    }
+  }
+  
+  return hasChanged;
 }
 
 module.exports = {
