@@ -17,7 +17,7 @@ const MAX_TOTAL_LISTINGS = 50; // Maximum total number of listings to fetch acro
  * @param {number} daysOld - Number of days old the listings should be (default: 1)
  * @returns {Promise<Object>} Listings data
  */
-async function getListingsByZipCode(zipCode, limit = DEFAULT_BATCH_SIZE, offset = 0, daysOld = 4) {
+async function getListingsByZipCode(zipCode, limit = DEFAULT_BATCH_SIZE, offset = 0, daysOld = 1) {
   const client = new RentCastApiClient();
   
   const params = {
@@ -41,7 +41,7 @@ async function getListingsByZipCode(zipCode, limit = DEFAULT_BATCH_SIZE, offset 
  * @param {number} daysOld - Number of days old the listings should be (default: 1)
  * @returns {Promise<Array>} All listings in the zip code (up to maxTotal)
  */
-async function getAllListingsInZipCode(zipCode, batchSize = DEFAULT_BATCH_SIZE, maxTotal = MAX_TOTAL_LISTINGS, daysOld = 4) {
+async function getAllListingsInZipCode(zipCode, batchSize = DEFAULT_BATCH_SIZE, maxTotal = MAX_TOTAL_LISTINGS, daysOld = 1) {
   const client = new RentCastApiClient();
   let allListings = [];
   let offset = 0;
