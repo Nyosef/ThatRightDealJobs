@@ -155,9 +155,37 @@ function hasHistoryDataChanged(existingHistory, newHistoryData) {
     'days_on_market'
   ];
   
+  // Date fields that need special comparison
+  const dateFields = [
+    'listed_date',
+    'removed_date'
+  ];
+  
   for (const field of fieldsToCompare) {
-    if (existingHistory[field] !== newHistoryData[field]) {
-      console.log(`Field ${field} changed: ${existingHistory[field]} -> ${newHistoryData[field]}`);
+    // Special handling for null/undefined comparison
+    const existingValue = existingHistory[field];
+    const newValue = newHistoryData[field];
+    
+    // Treat null and undefined as equivalent
+    if ((existingValue === null && newValue === undefined) || 
+        (existingValue === undefined && newValue === null)) {
+      continue;
+    }
+    
+    // Special handling for date fields
+    if (dateFields.includes(field) && existingValue && newValue) {
+      // Compare dates by their value rather than string representation
+      const existingDate = new Date(existingValue).getTime();
+      const newDate = new Date(newValue).getTime();
+      
+      if (existingDate !== newDate) {
+        console.log(`Field ${field} changed: ${existingValue} -> ${newValue}`);
+        return true;
+      }
+    }
+    // Regular comparison for other fields
+    else if (existingValue !== newValue) {
+      console.log(`Field ${field} changed: ${existingValue} -> ${newValue}`);
       return true;
     }
   }

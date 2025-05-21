@@ -153,9 +153,38 @@ function hasListingDataChanged(existingListing, newListingData) {
     'mls_number'
   ];
   
+  // Date fields that need special comparison
+  const dateFields = [
+    'listed_date',
+    'removed_date',
+    'last_seen_date'
+  ];
+  
   for (const field of fieldsToCompare) {
-    if (existingListing[field] !== newListingData[field]) {
-      console.log(`Field ${field} changed: ${existingListing[field]} -> ${newListingData[field]}`);
+    // Special handling for null/undefined comparison
+    const existingValue = existingListing[field];
+    const newValue = newListingData[field];
+    
+    // Treat null and undefined as equivalent
+    if ((existingValue === null && newValue === undefined) || 
+        (existingValue === undefined && newValue === null)) {
+      continue;
+    }
+    
+    // Special handling for date fields
+    if (dateFields.includes(field) && existingValue && newValue) {
+      // Compare dates by their value rather than string representation
+      const existingDate = new Date(existingValue).getTime();
+      const newDate = new Date(newValue).getTime();
+      
+      if (existingDate !== newDate) {
+        console.log(`Field ${field} changed: ${existingValue} -> ${newValue}`);
+        return true;
+      }
+    }
+    // Regular comparison for other fields
+    else if (existingValue !== newValue) {
+      console.log(`Field ${field} changed: ${existingValue} -> ${newValue}`);
       return true;
     }
   }
