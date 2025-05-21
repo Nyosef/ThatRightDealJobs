@@ -42,29 +42,8 @@ async function insertRecord(tableName, data) {
     
     // If table doesn't exist, handle it
     if (checkError && checkError.code === '42P01') {
-      console.log(`Table '${tableName}' does not exist. Creating it...`);
-      
-      // For api_data table
-      if (tableName === 'api_data') {
-        // Skip table creation since the user has already created it manually
-        console.log(`The '${tableName}' table has been created manually by the user.`);
-        console.log(`Expected schema: id (auto-generated), data (JSON)`);
-        throw new Error(`Table '${tableName}' exists but the query failed. Please check your data structure.`);
-      } 
-      // For _test_connection table
-      else if (tableName === '_test_connection') {
-        const { error: createError } = await supabase.rpc('create_test_connection_table');
-        
-        if (createError) {
-          // If RPC doesn't exist, provide SQL to create the table
-          console.log(`Could not create '${tableName}' table automatically.`);
-          console.log(`SQL to create table: CREATE TABLE ${tableName} (test_id SERIAL PRIMARY KEY, message TEXT, created_at TIMESTAMPTZ, data JSONB);`);
-          throw new Error(`Table '${tableName}' does not exist and could not be created automatically.`);
-        }
-      }
-      else {
-        throw new Error(`Table '${tableName}' does not exist.`);
-      }
+      console.log(`Table '${tableName}' does not exist.`);
+      throw new Error(`Table '${tableName}' does not exist. Please run the appropriate SQL script to create it.`);
     }
     
     // Insert the data
@@ -174,23 +153,8 @@ async function deleteRecords(tableName, filters) {
 // Test the Supabase connection
 async function testConnection() {
   try {
-    const supabase = getSupabaseClient();
-    
-    // A simple query to test the connection
-    const { data, error } = await supabase.from('_test_connection').select('*').limit(1).maybeSingle();
-    
-    // If the table doesn't exist, we'll get an error, but the connection is still working
-    if (error && error.code === '42P01') {
-      return {
-        connected: true,
-        message: 'Connected to Supabase, but the test table does not exist.'
-      };
-    } else if (error) {
-      return {
-        connected: false,
-        message: `Connection error: ${error.message}`
-      };
-    }
+    // Just check if we can initialize the client
+    getSupabaseClient();
     
     return {
       connected: true,

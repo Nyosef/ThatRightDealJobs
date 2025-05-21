@@ -1,4 +1,4 @@
-name: Daily Morning Workflow
+name: Daily Property Data Workflow
 
 on:
   schedule:
@@ -28,14 +28,31 @@ jobs:
         run: |
           echo "Creating .env file with secrets..."
           echo "ATTOM_API_KEY=${{ secrets.ATTOM_API_KEY }}" > .env
+          echo "RENTCAST_API_KEY=${{ secrets.RENTCAST_API_KEY }}" >> .env
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env
 
-      - name: Run daily tasks
+      - name: Run ATTOM daily tasks
         run: |
-          echo "Running daily tasks at $(date)"
+          echo "Running ATTOM daily tasks at $(date)"
           npm run daily-task
+
+      - name: Wait for database to process ATTOM data
+        run: |
+          echo "Waiting 5 minutes before running RentCast tasks..."
+          sleep 300
+
+      - name: Run RentCast daily tasks
+        run: |
+          echo "Running RentCast daily tasks at $(date)"
+          npm run rentcast-daily-task
+
+      - name: Run property linking tasks
+        run: |
+          echo "Running property linking tasks at $(date)"
+          npm run link-properties
 
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
+          echo "ATTOM, RentCast, and property linking tasks completed at $(date)"
