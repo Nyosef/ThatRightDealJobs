@@ -4,9 +4,9 @@
  */
 
 const attomApi = require('./attom');
+const rentCastApi = require('./rentCast');
 
 module.exports = {
-  attom: attomApi
-  // Future API integrations can be added here
-  // rentcast: rentcastApi
+  attom: attomApi,
+  rentCast: rentCastApi
 };
