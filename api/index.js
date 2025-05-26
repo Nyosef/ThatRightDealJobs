@@ -5,8 +5,10 @@
 
 const attomApi = require('./attom');
 const rentCastApi = require('./rentCast');
+const zillowApi = require('./zillow');
 
 module.exports = {
   attom: attomApi,
-  rentCast: rentCastApi
+  rentCast: rentCastApi,
+  zillow: zillowApi
 };

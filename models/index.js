@@ -3,26 +3,28 @@
  * Exports all model functions
  */
 
-const saleModel = require('./sale');
-const propertyModel = require('./property');
-const apiDataModel = require('./api-data');
-const zipModel = require('./zip');
-const propertyLinkModel = require('./property-link');
-const rentcastListingModel = require('./rentcast-listing');
-const rentcastListingAgentModel = require('./rentcast-listing-agent');
-const rentcastListingOfficeModel = require('./rentcast-listing-office');
-const rentcastBuilderModel = require('./rentcast-builder');
-const rentcastListingHistoryModel = require('./rentcast-listing-history');
+const apiData = require('./api-data');
+const property = require('./property');
+const propertyLink = require('./property-link');
+const rentcastBuilder = require('./rentcast-builder');
+const rentcastListing = require('./rentcast-listing');
+const rentcastListingAgent = require('./rentcast-listing-agent');
+const rentcastListingHistory = require('./rentcast-listing-history');
+const rentcastListingOffice = require('./rentcast-listing-office');
+const sale = require('./sale');
+const zip = require('./zip');
+const zillowListing = require('./zillow-listing');
 
 module.exports = {
-  sale: saleModel,
-  property: propertyModel,
-  apiData: apiDataModel,
-  zip: zipModel,
-  propertyLink: propertyLinkModel,
-  rentcastListing: rentcastListingModel,
-  rentcastListingAgent: rentcastListingAgentModel,
-  rentcastListingOffice: rentcastListingOfficeModel,
-  rentcastBuilder: rentcastBuilderModel,
-  rentcastListingHistory: rentcastListingHistoryModel
+  apiData,
+  property,
+  propertyLink,
+  rentcastBuilder,
+  rentcastListing,
+  rentcastListingAgent,
+  rentcastListingHistory,
+  rentcastListingOffice,
+  sale,
+  zip,
+  zillowListing
 };
