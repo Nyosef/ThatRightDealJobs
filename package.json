@@ -8,10 +8,14 @@
     "start": "node index.js",
     "daily-task": "node scripts/daily-task.js",
     "rentcast-daily-task": "node scripts/rentcast-daily-task.js",
+    "zillow-daily-task": "node scripts/zillow-daily-task.js",
     "link-properties": "node scripts/link-properties-task.js",
     "rentcast-example": "node scripts/rentcast_example.js",
+    "zillow-example": "node scripts/zillow_example.js",
     "link-quality": "node scripts/link-properties-task.js --check-quality",
-    "workflow": "npm run daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties"
+    "zillow-stats": "node scripts/zillow-daily-task.js --stats",
+    "workflow": "npm run daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties",
+    "full-workflow": "npm run daily-task && npm run zillow-daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties"
   },
   "repository": {
     "type": "git",
@@ -30,6 +34,7 @@
   "homepage": "https://github.com/username/ThatRightDeal#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "apify-client": "^2.12.4",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
     "request": "^2.88.2"
