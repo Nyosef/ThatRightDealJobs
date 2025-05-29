@@ -48,6 +48,16 @@ jobs:
           echo "Waiting 1 minute after Zillow tasks..."
           sleep 60
 
+      - name: Run Redfin daily tasks for zipcode 16146
+        run: |
+          echo "Running Redfin daily tasks for zipcode 16146 at $(date)"
+          npm run redfin-daily-task -- --zip=16146
+
+      - name: Wait after Redfin tasks
+        run: |
+          echo "Waiting 1 minute after Redfin tasks..."
+          sleep 60
+
       - name: Wait for database to process ATTOM data
         run: |
           echo "Waiting 1 minute before running RentCast tasks..."
@@ -71,4 +81,4 @@ jobs:
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
-          echo "ATTOM, Zillow (zipcode 16146), RentCast, property linking, and median calculation tasks completed at $(date)"
+          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), RentCast, property linking, and median calculation tasks completed at $(date)"
