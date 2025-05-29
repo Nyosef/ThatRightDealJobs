@@ -63,7 +63,12 @@ jobs:
           echo "Running property linking tasks at $(date)"
           npm run link-properties
 
+      - name: Calculate zip code medians
+        run: |
+          echo "Calculating median values for zip codes at $(date)"
+          npm run calculate-medians
+
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
-          echo "ATTOM, Zillow (zipcode 16146), RentCast, and property linking tasks completed at $(date)"
+          echo "ATTOM, Zillow (zipcode 16146), RentCast, property linking, and median calculation tasks completed at $(date)"
