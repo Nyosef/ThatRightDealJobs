@@ -14,6 +14,8 @@
     "zillow-example": "node scripts/zillow_example.js",
     "link-quality": "node scripts/link-properties-task.js --check-quality",
     "zillow-stats": "node scripts/zillow-daily-task.js --stats",
+    "calculate-medians": "node scripts/final-median-calculations.js",
+    "median-stats": "node scripts/final-median-calculations.js --stats",
     "workflow": "npm run daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties",
     "full-workflow": "npm run daily-task && npm run zillow-daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties"
   },
