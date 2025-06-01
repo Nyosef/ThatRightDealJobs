@@ -6,6 +6,7 @@
 const apiData = require('./api-data');
 const property = require('./property');
 const propertyLink = require('./property-link');
+const realtorListing = require('./realtor-listing');
 const redfinListing = require('./redfin-listing');
 const rentcastBuilder = require('./rentcast-builder');
 const rentcastListing = require('./rentcast-listing');
@@ -21,6 +22,7 @@ module.exports = {
   apiData,
   property,
   propertyLink,
+  realtorListing,
   redfinListing,
   rentcastBuilder,
   rentcastListing,
