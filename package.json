@@ -18,6 +18,9 @@
     "redfin-stats": "node scripts/redfin-daily-task.js --stats",
     "calculate-medians": "node scripts/final-median-calculations.js",
     "median-stats": "node scripts/final-median-calculations.js --stats",
+    "calculate-bedroom-medians": "node scripts/bedroom-median-calculations.js",
+    "test-bedroom-medians": "node scripts/test-bedroom-medians.js",
+    "bedroom-median-stats": "node scripts/bedroom-median-calculations.js --stats",
     "workflow": "npm run daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties",
     "full-workflow": "npm run daily-task && npm run zillow-daily-task && npm run redfin-daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties"
   },

@@ -73,12 +73,12 @@ jobs:
           echo "Running property linking tasks at $(date)"
           npm run link-properties
 
-      - name: Calculate zip code medians
+      - name: Calculate bedroom-specific zip code medians
         run: |
-          echo "Calculating median values for zip codes at $(date)"
-          npm run calculate-medians
+          echo "Calculating bedroom-specific median values for zip codes at $(date)"
+          npm run calculate-bedroom-medians
 
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
-          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), RentCast, property linking, and median calculation tasks completed at $(date)"
+          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), RentCast, property linking, and bedroom-specific median calculation tasks completed at $(date)"
