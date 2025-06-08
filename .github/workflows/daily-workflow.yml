@@ -88,7 +88,22 @@ jobs:
           echo "Calculating bedroom-specific median values for zip codes at $(date)"
           npm run calculate-bedroom-medians
 
+      - name: Wait before merging data
+        run: |
+          echo "Waiting 2 minutes for database consistency before merging..."
+          sleep 120
+
+      - name: Merge listing data from all sources
+        run: |
+          echo "Merging data from Zillow, Redfin, and Realtor sources at $(date)"
+          npm run merge-listings
+
+      - name: Generate merge statistics report
+        run: |
+          echo "Generating merge statistics at $(date)"
+          npm run merge-stats
+
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
-          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), Realtor (zipcode 16146), RentCast, property linking, and bedroom-specific median calculation tasks completed at $(date)"
+          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), Realtor (zipcode 16146), RentCast, property linking, bedroom-specific median calculation, and data merging tasks completed at $(date)"
