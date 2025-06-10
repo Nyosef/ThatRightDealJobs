@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS merged_listing (
   year_built INTEGER,                         -- Average or most common value
   lot_size BIGINT,                            -- Average lot size (sqft)
   
+  -- Zillow-Specific Fields
+  zestimate DECIMAL(12,2),                    -- Zillow Zestimate (Zillow-only field)
+  
   -- Source-Specific Text Fields (Overview/Descriptions)
   zillow_overview TEXT,                       -- From Zillow data/description
   redfin_overview TEXT,                       -- From Redfin listing_remarks
@@ -63,6 +66,12 @@ CREATE TABLE IF NOT EXISTS merged_listing (
   ranking_factors JSONB,                    -- Store ranking calculation details
   investment_metrics JSONB,                 -- Store calculated investment metrics
   
+  -- Change Tracking
+  last_change_reason VARCHAR(255),           -- Reason for the last update
+  changed_fields JSONB,                      -- Fields that changed with old/new values
+  change_source VARCHAR(100),                -- Sources that contributed to changes
+  change_details JSONB,                      -- Additional change metadata
+  
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -74,6 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_merged_listing_address ON merged_listing(address)
 CREATE INDEX IF NOT EXISTS idx_merged_listing_location ON merged_listing(lat, lon);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_zip5 ON merged_listing(zip5);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_price ON merged_listing(price);
+CREATE INDEX IF NOT EXISTS idx_merged_listing_zestimate ON merged_listing(zestimate);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_published ON merged_listing(published);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_source_count ON merged_listing(source_count);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_confidence ON merged_listing(confidence_score);
@@ -81,6 +91,8 @@ CREATE INDEX IF NOT EXISTS idx_merged_listing_conflicts ON merged_listing(confli
 CREATE INDEX IF NOT EXISTS idx_merged_listing_quality ON merged_listing(quality_score);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_ranking ON merged_listing(ranking_score);
 CREATE INDEX IF NOT EXISTS idx_merged_listing_updated ON merged_listing(updated_at);
+CREATE INDEX IF NOT EXISTS idx_merged_listing_change_source ON merged_listing(change_source);
+CREATE INDEX IF NOT EXISTS idx_merged_listing_last_change ON merged_listing(last_change_reason);
 
 -- Source ID indexes for joins
 CREATE INDEX IF NOT EXISTS idx_merged_listing_zillow_id ON merged_listing(zillow_id);
@@ -140,7 +152,7 @@ ON CONFLICT (config_key) DO NOTHING;
 -- Create merge statistics table for monitoring
 CREATE TABLE IF NOT EXISTS merge_statistics (
   id SERIAL PRIMARY KEY,
-  run_date DATE NOT NULL,
+  run_date DATE NOT NULL UNIQUE,
   total_processed INTEGER DEFAULT 0,
   total_merged INTEGER DEFAULT 0,
   exact_matches INTEGER DEFAULT 0,
