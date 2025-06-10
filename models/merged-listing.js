@@ -84,6 +84,9 @@ function mergePropertyData(sources, config) {
     year_built: null,
     lot_size: null,
     
+    // Zillow-specific fields
+    zestimate: null,
+    
     // Text fields (source-specific)
     zillow_overview: '',
     redfin_overview: '',
@@ -158,6 +161,9 @@ function mergePropertyData(sources, config) {
   merged.sqft = mergeNumericField('sqft', sources, config, merged.data_conflicts);
   merged.year_built = mergeNumericField('year_built', sources, config, merged.data_conflicts);
   merged.lot_size = mergeNumericField('lot_size', sources, config, merged.data_conflicts);
+  
+  // Merge Zillow-specific fields
+  merged.zestimate = extractZestimate(sources.zillow);
   
   // Merge text fields (source-specific overviews)
   merged.zillow_overview = extractOverview(sources.zillow, 'zillow');
@@ -354,6 +360,23 @@ function extractOverview(listing, source) {
 }
 
 /**
+ * Extract Zestimate from Zillow listing
+ * @param {Object} zillowListing - Zillow listing object
+ * @returns {number|null} Zestimate value or null if not available
+ */
+function extractZestimate(zillowListing) {
+  if (!zillowListing) return null;
+  
+  // Check if zestimate field exists and has a valid value
+  if (zillowListing.zestimate != null) {
+    const zestimate = parseFloat(zillowListing.zestimate);
+    return !isNaN(zestimate) && zestimate > 0 ? zestimate : null;
+  }
+  
+  return null;
+}
+
+/**
  * Merge property type from sources
  * @param {Object} sources - Source listings
  * @returns {string} Merged property type
@@ -445,18 +468,19 @@ function calculateQualityScore(mergedData, config) {
 }
 
 /**
- * Insert or update merged listing
+ * Insert or update merged listing with change tracking
  * @param {Object} mergedData - Merged listing data
+ * @param {string} changeReason - Reason for the change (e.g., "New data from zillow_daily_task")
  * @returns {Promise<Object>} Inserted/updated record
  */
-async function upsertMergedListing(mergedData) {
+async function upsertMergedListing(mergedData, changeReason = 'Data merge process') {
   const supabase = db.getSupabaseClient();
   
   try {
     // Check if a merged listing already exists for this address
     const { data: existing, error: findError } = await supabase
       .from('merged_listing')
-      .select('the_real_deal_id')
+      .select('*')
       .eq('address', mergedData.address)
       .maybeSingle();
     
@@ -468,24 +492,63 @@ async function upsertMergedListing(mergedData) {
     mergedData.last_merged_at = now;
     
     if (existing) {
-      // Update existing record
-      mergedData.updated_at = now;
+      // Detect changes between existing and new data
+      const changeDetection = detectChanges(existing, mergedData);
       
-      const { data, error } = await supabase
-        .from('merged_listing')
-        .update(mergedData)
-        .eq('the_real_deal_id', existing.the_real_deal_id)
-        .select()
-        .single();
-      
-      if (error) throw new Error(`Error updating merged listing: ${error.message}`);
-      
-      console.log(`Updated merged listing ${existing.the_real_deal_id} for address: ${mergedData.address}`);
-      return data;
+      if (changeDetection.hasChanges) {
+        // Update with change tracking
+        mergedData.updated_at = now;
+        mergedData.last_change_reason = changeReason;
+        mergedData.changed_fields = changeDetection.changedFields;
+        mergedData.change_source = changeDetection.contributingSources.join(',');
+        mergedData.change_details = {
+          change_count: changeDetection.changeCount,
+          timestamp: now,
+          previous_update: existing.updated_at
+        };
+        
+        const { data, error } = await supabase
+          .from('merged_listing')
+          .update(mergedData)
+          .eq('the_real_deal_id', existing.the_real_deal_id)
+          .select()
+          .single();
+        
+        if (error) throw new Error(`Error updating merged listing: ${error.message}`);
+        
+        // Log detailed changes
+        logChanges(existing.the_real_deal_id, mergedData.address, changeDetection, changeReason);
+        
+        return data;
+      } else {
+        // No changes detected, just update timestamps
+        const { data, error } = await supabase
+          .from('merged_listing')
+          .update({ 
+            last_merged_at: now,
+            updated_at: now 
+          })
+          .eq('the_real_deal_id', existing.the_real_deal_id)
+          .select()
+          .single();
+        
+        if (error) throw new Error(`Error updating merged listing timestamps: ${error.message}`);
+        
+        console.log(`No changes detected for merged listing ${existing.the_real_deal_id}: ${mergedData.address}`);
+        return data;
+      }
     } else {
       // Insert new record
       mergedData.created_at = now;
       mergedData.updated_at = now;
+      mergedData.last_change_reason = 'Initial merge - new record';
+      mergedData.change_source = 'new_record';
+      mergedData.changed_fields = {};
+      mergedData.change_details = {
+        change_count: 0,
+        timestamp: now,
+        initial_creation: true
+      };
       
       const { data, error } = await supabase
         .from('merged_listing')
@@ -495,7 +558,9 @@ async function upsertMergedListing(mergedData) {
       
       if (error) throw new Error(`Error inserting merged listing: ${error.message}`);
       
-      console.log(`Inserted new merged listing ${data.the_real_deal_id} for address: ${mergedData.address}`);
+      console.log(`✅ Created new merged listing ${data.the_real_deal_id} for address: ${mergedData.address}`);
+      console.log(`   📊 Sources: ${mergedData.source_count} (${Object.keys(mergedData.data_sources || {}).join(', ')})`);
+      
       return data;
     }
   } catch (error) {
@@ -1012,6 +1077,210 @@ async function getConflictSummary(zipCode = null) {
     console.error('Error getting conflict summary:', error.message);
     throw error;
   }
+}
+
+/**
+ * Detect changes between existing and new merged data
+ * @param {Object} existing - Existing merged listing data
+ * @param {Object} newData - New merged listing data
+ * @returns {Object} Change detection results
+ */
+function detectChanges(existing, newData) {
+  const changedFields = {};
+  const contributingSources = new Set();
+  let changeCount = 0;
+  
+  // Fields to monitor for changes
+  const monitoredFields = [
+    'price', 'last_sold_price', 'bedrooms', 'bathrooms', 'sqft', 'year_built', 
+    'lot_size', 'zestimate', 'property_type', 'listing_status', 'days_on_market',
+    'zillow_overview', 'redfin_overview', 'realtor_overview', 'source_count'
+  ];
+  
+  // Check each monitored field for changes
+  monitoredFields.forEach(field => {
+    const oldValue = existing[field];
+    const newValue = newData[field];
+    
+    // Handle different data types appropriately
+    if (hasFieldChanged(oldValue, newValue, field)) {
+      changedFields[field] = {
+        old: oldValue,
+        new: newValue,
+        source: determineFieldSource(field, newData, existing)
+      };
+      
+      // Add contributing source
+      const fieldSource = determineFieldSource(field, newData, existing);
+      if (fieldSource && fieldSource !== 'unknown') {
+        contributingSources.add(fieldSource);
+      }
+      
+      changeCount++;
+    }
+  });
+  
+  // Check for source changes (new sources added)
+  const oldSources = existing.data_sources || [];
+  const newSources = newData.data_sources || [];
+  
+  if (newSources.length !== oldSources.length) {
+    const oldSourceNames = oldSources.map(s => s.source);
+    const newSourceNames = newSources.map(s => s.source);
+    
+    newSourceNames.forEach(source => {
+      if (!oldSourceNames.includes(source)) {
+        contributingSources.add(source);
+      }
+    });
+  }
+  
+  return {
+    hasChanges: changeCount > 0,
+    changeCount,
+    changedFields,
+    contributingSources: Array.from(contributingSources)
+  };
+}
+
+/**
+ * Check if a field value has changed
+ * @param {any} oldValue - Previous value
+ * @param {any} newValue - New value
+ * @param {string} fieldName - Name of the field
+ * @returns {boolean} True if changed
+ */
+function hasFieldChanged(oldValue, newValue, fieldName) {
+  // Handle null/undefined values
+  if (oldValue == null && newValue == null) return false;
+  if (oldValue == null || newValue == null) return true;
+  
+  // Handle numeric fields with tolerance for floating point precision
+  const numericFields = ['price', 'last_sold_price', 'sqft', 'lot_size', 'zestimate'];
+  if (numericFields.includes(fieldName)) {
+    const oldNum = parseFloat(oldValue);
+    const newNum = parseFloat(newValue);
+    
+    if (isNaN(oldNum) && isNaN(newNum)) return false;
+    if (isNaN(oldNum) || isNaN(newNum)) return true;
+    
+    // Consider values changed if difference is more than $1 or 1 sqft
+    const tolerance = fieldName.includes('price') || fieldName === 'zestimate' ? 1 : 1;
+    return Math.abs(oldNum - newNum) > tolerance;
+  }
+  
+  // Handle integer fields
+  const integerFields = ['bedrooms', 'year_built', 'days_on_market', 'source_count'];
+  if (integerFields.includes(fieldName)) {
+    return parseInt(oldValue) !== parseInt(newValue);
+  }
+  
+  // Handle decimal fields (bathrooms)
+  if (fieldName === 'bathrooms') {
+    return Math.abs(parseFloat(oldValue) - parseFloat(newValue)) > 0.1;
+  }
+  
+  // Handle string fields
+  const oldStr = String(oldValue || '').trim();
+  const newStr = String(newValue || '').trim();
+  return oldStr !== newStr;
+}
+
+/**
+ * Determine which source contributed to a field change
+ * @param {string} fieldName - Name of the field
+ * @param {Object} newData - New merged data
+ * @param {Object} existing - Existing data
+ * @returns {string} Source name or 'multiple'
+ */
+function determineFieldSource(fieldName, newData, existing) {
+  // Map fields to their likely sources
+  const sourceMapping = {
+    zestimate: 'zillow',
+    zillow_overview: 'zillow',
+    redfin_overview: 'redfin',
+    realtor_overview: 'realtor'
+  };
+  
+  if (sourceMapping[fieldName]) {
+    return sourceMapping[fieldName];
+  }
+  
+  // For other fields, check which sources are present in new data
+  const newSources = (newData.data_sources || []).map(s => s.source);
+  const oldSources = (existing.data_sources || []).map(s => s.source);
+  
+  // If new sources were added, attribute change to new sources
+  const addedSources = newSources.filter(s => !oldSources.includes(s));
+  if (addedSources.length > 0) {
+    return addedSources.join(',');
+  }
+  
+  // If source count changed, return all sources
+  if (newSources.length !== oldSources.length) {
+    return newSources.join(',');
+  }
+  
+  // Default to multiple sources for averaged fields
+  return newSources.length > 1 ? 'multiple' : newSources[0] || 'unknown';
+}
+
+/**
+ * Log detailed changes to console
+ * @param {number} listingId - The real deal ID
+ * @param {string} address - Property address
+ * @param {Object} changeDetection - Change detection results
+ * @param {string} changeReason - Reason for changes
+ */
+function logChanges(listingId, address, changeDetection, changeReason) {
+  console.log(`✅ Updated merged listing ${listingId} for address: ${address}`);
+  
+  if (changeDetection.hasChanges) {
+    console.log(`   🔄 Changes detected:`);
+    
+    Object.entries(changeDetection.changedFields).forEach(([field, change]) => {
+      const oldValue = formatValueForDisplay(change.old, field);
+      const newValue = formatValueForDisplay(change.new, field);
+      const source = change.source || 'unknown';
+      
+      console.log(`      - ${field}: ${oldValue} → ${newValue} (source: ${source})`);
+    });
+    
+    console.log(`   📝 Change reason: ${changeReason}`);
+    
+    if (changeDetection.contributingSources.length > 0) {
+      console.log(`   📊 Contributing sources: ${changeDetection.contributingSources.join(', ')}`);
+    }
+  }
+}
+
+/**
+ * Format value for display in change logs
+ * @param {any} value - Value to format
+ * @param {string} fieldName - Field name for context
+ * @returns {string} Formatted value
+ */
+function formatValueForDisplay(value, fieldName) {
+  if (value == null) return 'null';
+  
+  // Format price fields
+  if (fieldName.includes('price') || fieldName === 'zestimate') {
+    return `$${Number(value).toLocaleString()}`;
+  }
+  
+  // Format square footage
+  if (fieldName === 'sqft' || fieldName === 'lot_size') {
+    return `${Number(value).toLocaleString()} sqft`;
+  }
+  
+  // Format other numeric fields
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  
+  // Format strings (truncate if too long)
+  const str = String(value);
+  return str.length > 50 ? str.substring(0, 47) + '...' : str;
 }
 
 module.exports = {
