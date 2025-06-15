@@ -1,170 +1,275 @@
 # ThatRightDeal
 
-A data pipeline for real estate property data, fetching from various APIs and storing in a Supabase database.
+A comprehensive real estate data pipeline that fetches property data from multiple sources, merges it intelligently, and calculates investment metrics to identify attractive real estate deals.
+
+## Overview
+
+ThatRightDeal is a sophisticated property analysis system that:
+
+1. **Collects Data** from multiple real estate APIs (Zillow, Redfin, Realtor, RentCast, ATTOM)
+2. **Merges Listings** from different sources using intelligent address and coordinate matching
+3. **Calculates Market Medians** by zip code and bedroom count for fallback data
+4. **Computes Investment Metrics** using proven real estate formulas
+5. **Ranks Properties** by investment attractiveness for deal identification
 
 ## Project Structure
 
-- `api/` - API client implementations for different data sources
-  - `attom/` - ATTOM API integration
-  - `rentcast/` - (Future) Rentcast API integration
-- `models/` - Database models and data processing logic
-- `scripts/` - Executable scripts for data tasks
-- `utils/` - Utility functions and helpers
+```
+├── api/                    # API client implementations
+│   ├── attom/             # ATTOM API integration
+│   ├── rentcast/          # RentCast API integration
+│   ├── zillow/            # Zillow scraping via Apify
+│   ├── redfin/            # Redfin scraping via Apify
+│   └── realtor/           # Realtor scraping via Apify
+├── models/                # Database models and data processing
+├── scripts/               # Executable scripts and documentation
+├── utils/                 # Utility functions and configuration
+└── .github/workflows/     # GitHub Actions automation
+```
 
-## ATTOM API Integration
+## Key Features
 
-This project integrates with the ATTOM API to fetch property sale data. The integration:
+### 🏠 Multi-Source Data Collection
 
-1. Fetches sale snapshot data for configured zip codes
-2. Processes the API response and maps it to our database schema
-3. Stores the data in the Supabase database, updating existing records if they've changed
+- **Zillow**: Property listings, Zestimates, market data
+- **Redfin**: MLS listings, sold prices, market insights
+- **Realtor**: Additional listing data and property details
+- **RentCast**: Rental estimates and market rent data
+- **ATTOM**: Property sales history and detailed property information
 
-### API Endpoints Used
+### 🔗 Intelligent Data Merging
 
-- `sale/snapshot` - Fetches property sale data for a specific geographic area and date range
+- Advanced address normalization and matching
+- Coordinate-based property matching for accuracy
+- Conflict detection and resolution between sources
+- Quality scoring and confidence metrics
 
-### Data Flow
+### 📊 Market Analysis
 
-1. The daily task script runs (manually or via GitHub Actions)
-2. For each configured zip code:
-   - Calculates a date range (one month back from current date)
-   - Fetches sale data from ATTOM API
-   - Processes the API response
-   - Inserts new records and updates changed records in the database
-3. Logs a summary of the operations performed
+- Zip code median calculations by bedroom count
+- Market rent estimates for investment analysis
+- Historical sale price medians for equity calculations
+- Automated data quality validation
+
+### 💰 Investment Metrics Calculation
+
+Based on proven real estate investment formulas:
+
+- **Cap Rate**: Net Operating Income ÷ List Price
+- **Gross Rent Multiplier (GRM)**: List Price ÷ Annual Gross Income
+- **Cash Flow**: Monthly and annual projections
+- **Instant Equity**: Built-in equity vs market medians
+- **NOI**: Net Operating Income with 45% expense ratio
+
+## Daily Workflow
+
+The system runs automatically via GitHub Actions with the following sequence:
+
+1. **Data Collection**: Fetch new listings from all sources
+2. **Property Linking**: Connect properties across different APIs
+3. **Median Calculations**: Update zip code market medians by bedroom count
+4. **Data Merging**: Intelligently merge listings from all sources
+5. **Investment Analysis**: Calculate investment metrics for all properties
+6. **Quality Reporting**: Generate statistics and quality reports
 
 ## Database Schema
 
-The database has the following tables:
+### Core Tables
 
-1. `api_data` - Stores raw API responses
+- **`merged_listing`** - Final merged property data with investment metrics
+- **`zillow_listing`** - Raw Zillow property data
+- **`redfin_listing`** - Raw Redfin property data
+- **`realtor_listing`** - Raw Realtor property data
+- **`rentcast_listing`** - RentCast rental data
+- **`zip`** - Zip code data with bedroom-specific medians
+- **`property`** - ATTOM property details
+- **`sale`** - ATTOM sales history
 
-   - `id` (int8) - Primary key
-   - `created_at` (timestamptz) - Record creation timestamp
-   - `data` (json) - Raw API response data
+### Investment Metrics Columns
 
-2. `sale_fact` - Stores processed sale data
+The `merged_listing` table includes these calculated investment metrics:
 
-   - `sale_id` (int8) - Primary key
-   - `attom_id` (int8) - ATTOM property ID
-   - `zip5` (bpchar) - ZIP code
-   - `rec_date` (date) - Record date
-   - `sale_amt` (numeric) - Sale amount
-   - `trans_type` (text) - Transaction type
-   - `trans_date` (date) - Transaction date
-   - `sale_meta` (jsonb) - Additional sale metadata
-   - `imported_at` (timestamptz) - Import timestamp
-
-3. `property` - Stores property information
-
-   - `attom_id` (int8) - Primary key
-   - `zip5` (bpchar) - ZIP code
-   - `apn` (text) - Assessor's Parcel Number
-   - `address_line` (text) - Street address
-   - `address_full` (text) - Full address
-   - `lat` (numeric) - Latitude
-   - `lon` (numeric) - Longitude
-   - `property_type` (text) - Property type
-   - `year_built` (int2) - Year built
-   - `livable_sqft` (int4) - Livable square footage
-   - `lot_size_acre` (numeric) - Lot size in acres
-   - `last_updated` (date) - Last update date
-
-4. `zip` - Stores ZIP code information
-   - `zip5` (bpchar) - Primary key
-   - `geo_id_v4` (uuid) - Geographic ID
-   - `city` (text) - City
-   - `state` (text) - State
-   - `land_sq_mi` (numeric) - Land area in square miles
-   - `water_sq_mi` (numeric) - Water area in square miles
-   - `created_at` (timestamptz) - Record creation timestamp
+```sql
+gross_income                 DECIMAL(12,2)  -- Annual gross rental income
+noi                         DECIMAL(12,2)  -- Net Operating Income
+cap_rate                    DECIMAL(5,4)   -- Capitalization Rate
+expected_cash_flow_annual   DECIMAL(12,2)  -- Expected annual cash flow
+expected_cash_flow_monthly  DECIMAL(12,2)  -- Expected monthly cash flow
+cash_on_cash_return         DECIMAL(5,4)   -- Cash-on-Cash Return
+grm                         DECIMAL(8,2)   -- Gross Rent Multiplier
+instant_equity_vs_median    DECIMAL(12,2)  -- Instant equity vs median
+equity_vs_zestimate         DECIMAL(12,2)  -- Equity vs Zestimate
+```
 
 ## Configuration
 
-The application uses environment variables for configuration:
-
-- `ATTOM_API_KEY` - ATTOM API key
-- `SUPABASE_URL` - Supabase URL
-- `SUPABASE_KEY` - Supabase API key
-- `TARGET_ZIP_CODES` - Comma-separated list of ZIP codes to process (optional)
-- `ZIP_GEOID_MAPPING` - JSON string mapping ZIP codes to geoIdV4 values (optional)
-
-## Running the Application
-
-### Locally
-
-1. Clone the repository
-2. Copy `.env.example` to `.env` and fill in your API keys
-3. Install dependencies: `npm install`
-4. Run the daily task: `node scripts/daily-task.js`
-
-### With Command-Line Arguments
-
-You can specify which ZIP codes to process using command-line arguments:
+Set these environment variables:
 
 ```bash
-node scripts/daily-task.js --zip=16146,90210
+# API Keys
+ATTOM_API_KEY=your_attom_api_key
+RENTCAST_API_KEY=your_rentcast_api_key
+APIFY_API_TOKEN=your_apify_token
+
+# Database
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+
+# Optional Configuration
+TARGET_ZIP_CODES=16146,90210  # Comma-separated zip codes
 ```
 
-### With GitHub Actions
+## Usage
 
-The application can be run automatically using GitHub Actions. Create a workflow file in `.github/workflows/daily-update.yml`:
+### Running Locally
 
-```yaml
-name: Daily Property Data Update
+```bash
+# Install dependencies
+npm install
 
-on:
-  schedule:
-    # Run daily at 2 AM UTC
-    - cron: "0 2 * * *"
-  workflow_dispatch:
-    inputs:
-      zip_codes:
-        description: "Comma-separated list of zip codes to process (leave empty for all)"
-        required: false
-        default: ""
+# Copy environment file
+cp .env.example .env
+# Edit .env with your API keys
 
-jobs:
-  update-property-data:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+# Run individual tasks
+npm run zillow-daily-task -- --zip=16146
+npm run redfin-daily-task -- --zip=16146
+npm run realtor-daily-task -- --zip=16146
+npm run rentcast-daily-task
+npm run calculate-bedroom-medians
+npm run merge-listings
+npm run calculate-investment-metrics
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run daily task
-        env:
-          ATTOM_API_KEY: ${{ secrets.ATTOM_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TARGET_ZIP_CODES: ${{ github.event.inputs.zip_codes || '' }}
-        run: node scripts/daily-task.js
+# Or run the full workflow
+npm run full-workflow
 ```
 
-## Adding New API Integrations
+### Available Scripts
 
-To add a new API integration (like Rentcast):
+```bash
+# Data Collection
+npm run daily-task                    # ATTOM data collection
+npm run zillow-daily-task             # Zillow listings
+npm run redfin-daily-task             # Redfin listings
+npm run realtor-daily-task            # Realtor listings
+npm run rentcast-daily-task           # RentCast rental data
 
-1. Create a new directory under `api/` for the new API
-2. Implement the API client and specific API functions
-3. Create model functions to process and store the data
-4. Update the daily task script to use the new API functions
+# Data Processing
+npm run link-properties               # Link properties across sources
+npm run calculate-bedroom-medians     # Calculate zip medians by bedroom
+npm run merge-listings                # Merge all listing sources
+npm run calculate-investment-metrics  # Calculate investment metrics
 
-## Extending ZIP Code Coverage
-
-To add support for new ZIP codes:
-
-1. Add the ZIP code and its corresponding geoIdV4 to the `DEFAULT_ZIP_GEOID_MAPPING` in `utils/config.js`
-2. The script will automatically include the new ZIP code in its processing
-
-Alternatively, you can set the `ZIP_GEOID_MAPPING` environment variable with a JSON string:
-
+# Analysis & Reporting
+npm run merge-stats                   # Merge quality statistics
+npm run bedroom-median-stats          # Median calculation stats
+npm run test-bedroom-medians          # Test median calculations
 ```
-ZIP_GEOID_MAPPING={"16146":"9910140a4987c800f1399e10ccabb2d0","90210":"another-geo-id-here"}
+
+### GitHub Actions
+
+The system runs automatically daily at 8:00 AM UTC via GitHub Actions. You can also trigger it manually from the Actions tab.
+
+## Investment Analysis
+
+### Finding Great Deals
+
+Query the database to find attractive investment properties:
+
+```sql
+-- Top properties by cap rate
+SELECT address, price, cap_rate, grm, instant_equity_vs_median
+FROM merged_listing
+WHERE cap_rate IS NOT NULL
+ORDER BY cap_rate DESC
+LIMIT 10;
+
+-- Properties with high equity potential
+SELECT address, price, instant_equity_vs_median, equity_vs_zestimate
+FROM merged_listing
+WHERE instant_equity_vs_median > 50000
+ORDER BY instant_equity_vs_median DESC;
+
+-- Best overall deals (high cap rate + positive equity)
+SELECT address, price, cap_rate, grm, instant_equity_vs_median
+FROM merged_listing
+WHERE cap_rate > 0.10
+  AND instant_equity_vs_median > 0
+ORDER BY cap_rate DESC, instant_equity_vs_median DESC;
 ```
+
+### Investment Metrics Explained
+
+- **Cap Rate > 8%**: Generally considered good for rental properties
+- **GRM < 10**: Lower is better - how many years to pay off with gross rent
+- **Positive Instant Equity**: Property listed below market median
+- **High Cash Flow**: Strong monthly income potential
+
+## Data Quality & Validation
+
+The system includes comprehensive quality controls:
+
+- **Address Matching**: Fuzzy matching with confidence scoring
+- **Coordinate Validation**: GPS-based property verification
+- **Conflict Resolution**: Intelligent handling of data discrepancies
+- **Quality Scoring**: Overall data quality metrics
+- **Error Tracking**: Detailed logging and monitoring
+
+## Documentation
+
+Detailed documentation is available in the `scripts/` directory:
+
+- [Investment Metrics](scripts/README_INVESTMENT_METRICS.md) - Investment calculation details
+- [Merged Listings](scripts/README_MERGED_LISTINGS.md) - Data merging process
+- [Bedroom Medians](scripts/README_BEDROOM_MEDIANS.md) - Market median calculations
+- [General Medians](scripts/README_MEDIANS.md) - Overall median calculations
+
+## Architecture
+
+### Data Flow
+
+1. **Collection**: APIs → Raw listing tables
+2. **Linking**: Property matching across sources
+3. **Aggregation**: Zip median calculations
+4. **Merging**: Intelligent data consolidation
+5. **Analysis**: Investment metrics calculation
+6. **Output**: Ranked investment opportunities
+
+### Key Technologies
+
+- **Node.js**: Runtime environment
+- **Supabase**: PostgreSQL database and API
+- **Apify**: Web scraping platform for real estate sites
+- **GitHub Actions**: Automated daily workflows
+
+## Future Enhancements
+
+- **Telegram Bot**: Automated deal alerts
+- **Web Dashboard**: Visual property analysis interface
+- **Machine Learning**: Predictive pricing models
+- **Market Trends**: Historical analysis and forecasting
+- **Portfolio Tracking**: Investment performance monitoring
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests and documentation
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Support
+
+For questions or issues:
+
+1. Check the documentation in `scripts/README_*.md`
+2. Review the GitHub Issues
+3. Create a new issue with detailed information
+
+---
+
+**ThatRightDeal** - Finding the right real estate deals through data-driven analysis.

@@ -103,7 +103,12 @@ jobs:
           echo "Generating merge statistics at $(date)"
           npm run merge-stats
 
+      - name: Calculate investment metrics for merged listings
+        run: |
+          echo "Calculating investment metrics for all merged listings at $(date)"
+          npm run calculate-investment-metrics
+
       - name: Report status
         run: |
           echo "Daily workflow completed successfully"
-          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), Realtor (zipcode 16146), RentCast, property linking, bedroom-specific median calculation, and data merging tasks completed at $(date)"
+          echo "ATTOM, Zillow (zipcode 16146), Redfin (zipcode 16146), Realtor (zipcode 16146), RentCast, property linking, bedroom-specific median calculation, data merging, and investment metrics calculation tasks completed at $(date)"
