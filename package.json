@@ -28,6 +28,7 @@
     "merge-conflicts": "node scripts/merge-listings-task.js --conflicts",
     "merge-dry-run": "node scripts/merge-listings-task.js --dry-run",
     "init-merge-config": "node scripts/merge-listings-task.js --init-config",
+    "calculate-investment-metrics": "node scripts/calculate-investment-metrics.js",
     "workflow": "npm run daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties",
     "full-workflow": "npm run daily-task && npm run zillow-daily-task && npm run redfin-daily-task && echo 'Waiting 30 minutes before running RentCast task...' && sleep 1800 && npm run rentcast-daily-task && npm run link-properties"
   },
