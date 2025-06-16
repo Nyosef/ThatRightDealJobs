@@ -58,7 +58,7 @@ Based on proven real estate investment formulas:
 - **Cap Rate**: Net Operating Income ÷ List Price
 - **Gross Rent Multiplier (GRM)**: List Price ÷ Annual Gross Income
 - **Cash Flow**: Monthly and annual projections
-- **Instant Equity**: Built-in equity vs market medians
+- **Instant Equity**: Built-in equity vs median Zestimate for similar properties
 - **NOI**: Net Operating Income with 45% expense ratio
 
 ## Daily Workflow

@@ -88,7 +88,7 @@ async function calculateInvestmentMetrics(listing) {
     // Resolve values with fallback logic
     const marketRent = zipMedians[`median_market_rent_${bedroomCategory}`];
     const listPrice = listing.price || zipMedians[`median_zestimate_${bedroomCategory}`];
-    const medianSalePrice = zipMedians[`median_last_sold_price_${bedroomCategory}`];
+    const medianZestimate = zipMedians[`median_zestimate_${bedroomCategory}`];
     const zestimate = listing.zestimate || zipMedians[`median_zestimate_${bedroomCategory}`];
     
     // Validate required values
@@ -110,7 +110,7 @@ async function calculateInvestmentMetrics(listing) {
     const expectedCashFlowMonthly = noi / 12;
     const cashOnCashReturn = noi / listPrice; // Same as cap rate for all-cash
     const grm = listPrice / grossIncome;
-    const instantEquityVsMedian = medianSalePrice ? (medianSalePrice - listPrice) : null;
+    const instantEquityVsMedian = medianZestimate ? (medianZestimate - listPrice) : null;
     const equityVsZestimate = zestimate ? (zestimate - listPrice) : null;
     
     // Log calculation details for debugging

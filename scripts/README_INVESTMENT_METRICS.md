@@ -54,8 +54,8 @@ Based on the Zillow Scraper POC Section 4, the following metrics are calculated 
 
 ### 8. Instant Equity vs Median
 
-- **Formula**: `medianSalePrice - listPrice`
-- **Description**: Built-in equity compared to median sale prices
+- **Formula**: `medianZestimate - listPrice`
+- **Description**: Built-in equity compared to median Zestimate for similar properties
 - **Column**: `instant_equity_vs_median`
 
 ### 9. Equity vs Zestimate
@@ -78,10 +78,10 @@ The calculation uses a smart fallback system to ensure maximum data coverage:
 - **Primary**: `merged_listing.price`
 - **Fallback**: `zip.median_zestimate_{bedrooms}br`
 
-### Median Sale Price
+### Median Zestimate (for Instant Equity)
 
-- **Source**: `zip.median_last_sold_price_{bedrooms}br`
-- **Logic**: Always uses zip median data by bedroom count
+- **Source**: `zip.median_zestimate_{bedrooms}br`
+- **Logic**: Always uses zip median data by bedroom count for instant equity calculation
 
 ### Zestimate
 
